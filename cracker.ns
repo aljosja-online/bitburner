@@ -1,0 +1,210 @@
+/** @param {NS} ns **/
+async function tryCrack(ns, host, options) {
+  if (ns.hasRootAccess(host)) {
+    await ns.slow_print(host + ":already has root access");
+    return true;
+  } else {
+    if (ns.getHackingLevel() < ns.getServerRequiredHackingLevel(host)) {
+      await ns.slow_print(host + ":higher hacking level needed");
+      return false;
+    } else {
+      let has = f => ns.fileExists(f, "home");
+      let openedPorts = 0;
+      if (has("brutessh.exe")) { ns.brutessh(host); ++openedPorts; }
+      if (has("ftpcrack.exe")) { ns.ftpcrack(host); ++openedPorts; }
+      if (has("relaysmtp.exe")) { ns.relaysmtp(host); ++openedPorts; }
+      if (has("httpworm.exe")) { ns.httpworm(host); ++openedPorts; }
+      if (has("sqlinject.exe")) { ns.sqlinject(host); ++openedPorts; }
+
+      if (openedPorts < ns.getServerNumPortsRequired(host)) {
+        await ns.slow_print(host + ":not enough open ports");
+        return false;
+      } else {
+        ns.nuke(host);
+        await ns.slow_print(host + ":nuked");
+        /* const backdoorTry = await ns.installBackdoor();
+        if (backdoorTry) {
+          await ns.slow_print(host + ":installed backdoor")
+        } else {
+        await ns.slow_print(host + ":backdoor installation failed")
+        } */
+        return true;
+      }
+    }
+  }
+}
+
+/** @param {NS} ns **/
+async function getFunds(ns, host, options) {
+  if (ns.fileExists("download.ns", host) && !options.overwrite) {
+    await ns.slow_print(host + ":download.ns already present");
+  } else {
+    const fileCopy = await ns.scp("download.ns", "home", host);
+    if (fileCopy) {
+      await ns.slow_print(host + ":download.ns copied");
+    } else {
+      await ns.slow_print(host + ":error copying download.ns");
+    }
+  }
+  const ramUse = ns.getScriptRam("download.ns");
+  const ramServer = ns.getServerMaxRam(host);
+  const ramServerUsed = ns.getServerUsedRam(host);
+  const threads = Math.floor((ramServer - ramServerUsed) / ramUse);
+  if (threads > 0) {
+    const down = ns.exec("download.ns", host, threads, host);
+    if (down) {
+      await ns.slow_print(host + ":download.ns is running");
+    } else {
+      await ns.slow_print(host + ":error running download.ns");
+    }
+  } else {
+    await ns.slow_print(host + ":no more room for any threads of download.ns");
+  }
+}
+
+/** @param {NS} ns **/
+function sonar(ns, options) {
+  
+  // option object
+  options.walk = {
+    home: {
+      list: [],
+      path: [],
+      steps: 0
+    },
+    step1: [],
+    step2: [],
+    step3: []
+  };
+
+  // first scan
+  const origin = ns.scan("home");
+  options.walk.step1 = origin;
+  options.walk["home"].list = origin;
+
+  ns.tprint("foodnstuff scan:" + ns.scan("foodnstuff"));
+
+  // second scan
+  for (let i; i < options.walk.step1.length; i++) {
+    const nextPlace = ns.exec("scan", options.walk.step1[i], options.walk.step1[i]);
+    options.walk.step2 = nextPlace;
+    for (let j; j < nextPlace.length; j++) {
+      options.walk[step1[i]].list.push(nextPlace[j]);
+      options.walk.step2.push(nextPlace[j]);
+    }
+  }
+  options.walk.step2 = [... new Set(options.walk.step2)];
+
+  return options;
+}
+
+/** @param {NS} ns **/
+export async function main(ns) {
+
+  // give the whole thing a hacky feel
+  ns.slow_print = async function slow_print(input) {
+    this.tprint(input);
+    await this.sleep(123);
+  }
+
+  await ns.slow_print("");
+  await ns.slow_print("");
+  await ns.slow_print("");
+  await ns.slow_print("init program");
+  await ns.sleep(333);
+  await ns.slow_print("");
+  await ns.slow_print("-> validate input <-");
+
+  // god dammit for having to build own flag logic
+  let options = {
+    "host": [],
+    "hostlist": "",
+    "overwrite": false,
+    "sonar": false
+  }
+
+  let nextArg = false;
+
+  for (let i = 0; i < ns.args.length; i++) {
+    const el = ns.args[i];
+
+    if (!nextArg) {
+      // check if flags
+      const elPrefix = typeof el == "string" ? el.slice(0, 2) : false;
+      const option = typeof el == "string" ? el.slice(2) : false;
+
+      if (elPrefix == "--") {
+        await ns.slow_print(el + " is a flag");
+        // check if in defined options
+        await ns.slow_print(option + ":possible option");
+        if (option in options) {
+          await ns.slow_print(option + ":option identified");
+          if (typeof options[option] == 'boolean') {
+            options[option] = !options[option];
+            await ns.slow_print(option + ":" + options[option] + " -> option switched");
+          } else {
+            nextArg = option;
+          }
+        } else {
+          await ns.slow_print(option + " is an unknown flag");
+        }
+      } else {
+        await ns.slow_print(el + " is unrecognized input");
+      }
+    } else {
+      // check if next arg is input of previous
+      if (nextArg) {
+        await ns.slow_print(nextArg + " values -> " + el);
+        options[nextArg] = el;
+        nextArg = false;
+      }
+    }
+  }
+
+  /*
+  let options = ns.flags([
+    ["host", []],
+    ["hostlist", ""]
+    ["overwrite", false]
+  ]);
+  */
+
+  await ns.slow_print("my options -> " + options);
+
+  if (options.hostlist.length > 0) {
+    const myArr = options.hostlist.split(",");
+    options.host = [...options.host, ...myArr];
+  }
+
+  await ns.slow_print("updated host list -> " + options);
+  await ns.slow_print("-> input validated <-");
+  await ns.sleep(321);
+  await ns.slow_print("");
+
+  if (options.sonar) {
+    options = sonar(ns, options);
+    await ns.slow_print("sonar options: ");
+    await ns.slow_print(options.walk);
+  }
+
+  if (options.host.length) {
+    await ns.slow_print("typeof hosts: " + typeof options.host);
+    await ns.slow_print("hosts: " + options.host);
+    for (let i = 0; i < options.host.length; i++) {
+      await ns.slow_print("");
+      await ns.sleep(321);
+      await ns.slow_print(">---------------->");
+      await ns.slow_print("host: " + options.host[i]);
+      await ns.slow_print("<----------------<");
+      await ns.sleep(321);
+      const startCracking = await tryCrack(ns, options.host[i]);
+      if (startCracking, options) {
+        await ns.slow_print(";) Start acquiring funds");
+        await ns.sleep(321);
+        await getFunds(ns, options.host[i], options);
+      } else {
+        await ns.slow_print("Not yet grasshopper");
+      }
+    }
+  }
+}

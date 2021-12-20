@@ -1,13 +1,16 @@
 /** @param {NS} ns **/
 async function tryCrack(ns, host, options) {
+  await ns.sleep(options.sleep);
   if (ns.hasRootAccess(host)) {
-    await ns.slow_print(host + ":already has root access");
+    ns.tprint(host + ":already has root access");
     return true;
   } else {
     if (ns.getHackingLevel() < ns.getServerRequiredHackingLevel(host)) {
-      await ns.slow_print(host + ":higher hacking level needed");
+      ns.tprint(host + ":higher hacking level needed");
       return false;
     } else {
+      await ns.sleep(options.sleep);
+      ns.tprint(host + ":try opening ports");
       let has = f => ns.fileExists(f, "home");
       let openedPorts = 0;
       if (has("brutessh.exe")) { ns.brutessh(host); ++openedPorts; }
@@ -17,11 +20,12 @@ async function tryCrack(ns, host, options) {
       if (has("sqlinject.exe")) { ns.sqlinject(host); ++openedPorts; }
 
       if (openedPorts < ns.getServerNumPortsRequired(host)) {
-        await ns.slow_print(host + ":not enough open ports");
+        ns.tprint(host + ":not enough open ports");
         return false;
       } else {
+        await ns.sleep(options.sleep);
         ns.nuke(host);
-        await ns.slow_print(host + ":nuked");
+        ns.tprint(host + ":nuked");
         /* const backdoorTry = await ns.installBackdoor();
         if (backdoorTry) {
           await ns.slow_print(host + ":installed backdoor")
@@ -36,14 +40,16 @@ async function tryCrack(ns, host, options) {
 
 /** @param {NS} ns **/
 async function getFunds(ns, host, options) {
+  await ns.sleep(options.sleep);
   if (ns.fileExists("download.ns", host) && !options.overwrite) {
-    await ns.slow_print(host + ":download.ns already present");
+    ns.tprint(host + ":download.ns already present");
   } else {
     const fileCopy = await ns.scp("download.ns", "home", host);
     if (fileCopy) {
-      await ns.slow_print(host + ":download.ns copied");
+      await ns.sleep(options.sleep);
+      ns.tprint(host + ":download.ns copied");
     } else {
-      await ns.slow_print(host + ":error copying download.ns");
+      ns.tprint(host + ":error copying download.ns");
     }
   }
   const ramUse = ns.getScriptRam("download.ns");
@@ -51,77 +57,213 @@ async function getFunds(ns, host, options) {
   const ramServerUsed = ns.getServerUsedRam(host);
   const threads = Math.floor((ramServer - ramServerUsed) / ramUse);
   if (threads > 0) {
+    await ns.sleep(options.sleep);
     const down = ns.exec("download.ns", host, threads, host);
     if (down) {
-      await ns.slow_print(host + ":download.ns is running");
+      ns.tprint(host + ":download.ns is running");
     } else {
-      await ns.slow_print(host + ":error running download.ns");
+      ns.tprint(host + ":error running download.ns");
     }
   } else {
-    await ns.slow_print(host + ":no more room for any threads of download.ns");
+    ns.tprint(host + ":no more room for any threads of download.ns");
   }
 }
 
 /** @param {NS} ns **/
-function sonar(ns, options) {
+async function walkndeploy(ns, options) {
+  await ns.sleep(options.sleep);
+  const a = ns.scan("home");
+  ns.tprint("walk: " + a);
+  ns.tprint("typeof: " + typeof a);
+  ns.tprint("walk length: " + a.length);
   
-  // option object
-  options.walk = {
-    home: {
-      list: [],
-      path: [],
-      steps: 0
-    },
-    step1: [],
-    step2: [],
-    step3: []
-  };
+  // see if this works, and if it works read up on recursion
+  for (let i = 0; i < a.length; i++) {
+    await ns.sleep(options.sleep);
+    ns.tprint("");
+    ns.tprint("->");
+    ns.tprint("selected: " + a[i]);
+    let b = ns.scan(a[i]);
+    ns.tprint("walk: " + b);
+    let previous = ["home"];
 
-  // first scan
-  const origin = ns.scan("home");
-  options.walk.step1 = origin;
-  options.walk["home"].list = origin;
+    // run code at this place
+    await hoppa(ns, a[i], options);
 
-  ns.tprint("foodnstuff scan:" + ns.scan("foodnstuff"));
+    // get new links
+    const forward = b.filter(value => !previous.includes(value));
+    
+    //update current place to previous
+    previous.push(a[i]);
+    ns.tprint(a[i] + ":pushed to previous");
+    ns.tprint("previous:" + previous);
 
-  // second scan
-  for (let i; i < options.walk.step1.length; i++) {
-    const nextPlace = ns.exec("scan", options.walk.step1[i], options.walk.step1[i]);
-    options.walk.step2 = nextPlace;
-    for (let j; j < nextPlace.length; j++) {
-      options.walk[step1[i]].list.push(nextPlace[j]);
-      options.walk.step2.push(nextPlace[j]);
-    }
+    // go to links 2 deep
+    for (let j = 0; j < forward.length; j++) {
+      await ns.sleep(options.sleep);
+      ns.tprint("");
+      ns.tprint("-->");
+      ns.tprint("selected 2nd level: " + forward[j]);
+      let b = ns.scan(forward[j]);
+      ns.tprint("walk: " + b);
+
+      // run code at this place
+      await hoppa(ns, forward[j], options);
+
+      // get new links
+      const keepgoing = b.filter(value => !previous.includes(value));
+      
+      //update current place to previous
+      previous.push(forward[j]);
+
+      // go to links 3 deep
+      for (let h = 0; h < keepgoing.length; h++) {
+        await ns.sleep(options.sleep);
+        ns.tprint("");
+        ns.tprint("--->");
+        ns.tprint("selected 3rd level: " + keepgoing[h]);
+        let b = ns.scan(keepgoing[h]);
+        ns.tprint("walk: " + b);
+
+        // run code at this place
+        await hoppa(ns, keepgoing[h], options);
+
+        // get new links
+        const notEnough = b.filter(value => !previous.includes(value));
+        
+        //update current place to previous
+        previous.push(keepgoing[h]);
+
+        // go to links 4 deep
+        for (let g = 0; g < notEnough.length; g++) {
+          await ns.sleep(options.sleep);
+          ns.tprint("");
+          ns.tprint("---->");
+          ns.tprint("selected 4rd level: " + notEnough[g]);
+          let b = ns.scan(notEnough[g]);
+          ns.tprint("walk: " + b);
+
+          // run code at this place
+          await hoppa(ns, notEnough[g], options);
+
+          // get new links
+          const moreLinks = b.filter(value => !previous.includes(value));
+          
+          //update current place to previous
+          previous.push(notEnough[g]);
+
+          // go to links 5 deep
+          for (let k = 0; k < moreLinks.length; k++) {
+            await ns.sleep(options.sleep);
+            ns.tprint("");
+            ns.tprint("----->");
+            ns.tprint("selected 5rd level: " + moreLinks[k]);
+            let b = ns.scan(moreLinks[k]);
+            ns.tprint("walk: " + b);
+
+            // run code at this place
+            await hoppa(ns, moreLinks[k], options);
+
+            // get new links
+            const nextLevel = b.filter(value => !previous.includes(value));
+            
+            //update current place to previous
+            previous.push(moreLinks[k]);
+
+            // go to links 6 deep
+            for (let l = 0; l < nextLevel.length; l++) {
+              await ns.sleep(options.sleep);
+              ns.tprint("");
+              ns.tprint("------>");
+              ns.tprint("selected 6rd level: " + nextLevel[l]);
+              let b = ns.scan(nextLevel[l]);
+              ns.tprint("walk: " + b);
+
+              // run code at this place
+              await hoppa(ns, nextLevel[l], options);
+
+              // get new links
+              const letsGo = b.filter(value => !previous.includes(value));
+              
+              //update current place to previous
+              previous.push(nextLevel[l]);
+
+              // go to links 7 deep
+              for (let m = 0; m < letsGo.length; m++) {
+                await ns.sleep(options.sleep);
+                ns.tprint("");
+                ns.tprint("------->");
+                ns.tprint("selected 7rd level: " + letsGo[m]);
+                let b = ns.scan(letsGo[m]);
+                ns.tprint("walk: " + b);
+
+                // run code at this place
+                await hoppa(ns, letsGo[m], options);
+
+                // get new links
+                const superSayan = b.filter(value => !previous.includes(value));
+                
+                //update current place to previous
+                previous.push(letsGo[m]);
+
+                // why are you so retarded, don't you see you use the same function over and over?
+                // yeah but i don't variables and scoping yet i guess. and i'm also tired.
+                // also I'm cosplaying a computer criminal trying to hack, probably using sloppy code.
+                // my criminal background was tough, and so i'm slightly retarded (in my role).
+                // also have retarded knowledge of alphabet.
+                for (let n = 0; n < superSayan.length; n++) {
+                  await ns.sleep(options.sleep);
+                  ns.tprint("");
+                  ns.tprint("-------->");
+                  ns.tprint("selected 8rd level: " + superSayan[n]);
+
+                  // run code at this place
+                  await hoppa(ns, superSayan[n], options);
+                  
+                  //update current place to previous
+                  previous.push(superSayan[n]);
+                }
+              }
+            }
+          }
+        }
+      }
+    }   
   }
-  options.walk.step2 = [... new Set(options.walk.step2)];
 
-  return options;
+  async function hoppa(ns, host, options) {
+      const startCracking = await tryCrack(ns, host, options);
+      if (startCracking) {
+        ns.tprint(";) Start acquiring funds");
+        await ns.sleep(options.sleep);
+        await getFunds(ns, host, options);
+      } else {
+        ns.tprint("Not yet grasshopper");
+      }
+  }
 }
 
 /** @param {NS} ns **/
 export async function main(ns) {
-
-  // give the whole thing a hacky feel
-  ns.slow_print = async function slow_print(input) {
-    this.tprint(input);
-    await this.sleep(123);
-  }
-
-  await ns.slow_print("");
-  await ns.slow_print("");
-  await ns.slow_print("");
-  await ns.slow_print("init program");
-  await ns.sleep(333);
-  await ns.slow_print("");
-  await ns.slow_print("-> validate input <-");
 
   // god dammit for having to build own flag logic
   let options = {
     "host": [],
     "hostlist": "",
     "overwrite": false,
-    "sonar": false
+    "scan": false,
+    "sleep": 200
   }
+
+  ns.tprint("");
+  ns.tprint("");
+  ns.tprint("");
+  ns.tprint("init program");
+  await ns.sleep(options.sleep);
+  ns.tprint("");
+  ns.tprint("-> validate input <-");
+
+  
 
   let nextArg = false;
 
@@ -134,27 +276,27 @@ export async function main(ns) {
       const option = typeof el == "string" ? el.slice(2) : false;
 
       if (elPrefix == "--") {
-        await ns.slow_print(el + " is a flag");
+        ns.tprint(el + " is a flag");
         // check if in defined options
-        await ns.slow_print(option + ":possible option");
+        ns.tprint(option + ":possible option");
         if (option in options) {
-          await ns.slow_print(option + ":option identified");
+          ns.tprint(option + ":option identified");
           if (typeof options[option] == 'boolean') {
             options[option] = !options[option];
-            await ns.slow_print(option + ":" + options[option] + " -> option switched");
+            ns.tprint(option + ":" + options[option] + " -> option switched");
           } else {
             nextArg = option;
           }
         } else {
-          await ns.slow_print(option + " is an unknown flag");
+          ns.tprint(option + " is an unknown flag");
         }
       } else {
-        await ns.slow_print(el + " is unrecognized input");
+        ns.tprint(el + " is unrecognized input");
       }
     } else {
       // check if next arg is input of previous
       if (nextArg) {
-        await ns.slow_print(nextArg + " values -> " + el);
+        ns.tprint(nextArg + " values -> " + el);
         options[nextArg] = el;
         nextArg = false;
       }
@@ -169,42 +311,41 @@ export async function main(ns) {
   ]);
   */
 
-  await ns.slow_print("my options -> " + options);
+  ns.tprint("my options -> " + options);
 
   if (options.hostlist.length > 0) {
     const myArr = options.hostlist.split(",");
     options.host = [...options.host, ...myArr];
+    ns.tprint("updated host list -> " + options);
   }
 
-  await ns.slow_print("updated host list -> " + options);
-  await ns.slow_print("-> input validated <-");
-  await ns.sleep(321);
-  await ns.slow_print("");
+  ns.tprint("-> input validated <-");
+  await ns.sleep(options.sleep);
+  ns.tprint("");
 
-  if (options.sonar) {
-    options = sonar(ns, options);
-    await ns.slow_print("sonar options: ");
-    await ns.slow_print(options.walk);
-  }
-
-  if (options.host.length) {
-    await ns.slow_print("typeof hosts: " + typeof options.host);
-    await ns.slow_print("hosts: " + options.host);
+  if (options.host.length > 0) {
+    ns.tprint("going through hosts");
+    ns.tprint("typeof hosts: " + typeof options.host);
+    ns.tprint("hosts: " + options.host);
     for (let i = 0; i < options.host.length; i++) {
-      await ns.slow_print("");
-      await ns.sleep(321);
-      await ns.slow_print(">---------------->");
-      await ns.slow_print("host: " + options.host[i]);
-      await ns.slow_print("<----------------<");
-      await ns.sleep(321);
+      ns.tprint("");
+      await ns.sleep(options.sleep);
+      ns.tprint(">---------------->");
+      ns.tprint("host: " + options.host[i]);
+      ns.tprint("<----------------<");
+      await ns.sleep(options.sleep);
       const startCracking = await tryCrack(ns, options.host[i]);
-      if (startCracking, options) {
-        await ns.slow_print(";) Start acquiring funds");
-        await ns.sleep(321);
+      if (startCracking) {
+        ns.tprint(";) Start acquiring funds");
+        await ns.sleep(options.sleep);
         await getFunds(ns, options.host[i], options);
       } else {
-        await ns.slow_print("Not yet grasshopper");
+        ns.tprint("Not yet grasshopper");
       }
     }
+  }
+  if (options.scan) {
+    ns.tprint("->> using scan option");
+    await walkndeploy(ns, options);
   }
 }

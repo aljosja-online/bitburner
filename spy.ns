@@ -1,44 +1,92 @@
 /** @param {NS} ns **/
 export async function main(ns) {
 
+  // setup any flags allowed with the script
   let options = {
     "host": [],
     "hostlist": "",
-    "overwrite": false,
-    "scan": false,
-    "sleep": 220
+    "traverse": false,
+    "showGrowth": false,
+    "sleep": 220,
+    "debug": false,
+    "verbose": false,
+    "rootAcces": true
+  };
+
+  // setup any cleanup or exit code
+  // ns.atExit();
+
+  // get argument flags through custom function -> i can't get ns.flags to work
+  options = await myArgParser(ns, options);
+
+  //// select a function ////
+  let myFunctionLoaded = false;
+
+  // getTimings: show host, if it has root access and shows growTime, how much growth it delivers, the current money and max money
+  if (!myFunctionLoaded && options.showGrowth) {
+    options.debug && ns.tprint("< function loaded >");
+    options.debug && options.verbose && ns.tprint("function loaded: showGrowth");
+
+    /** @param {NS} ns **/
+    options.myFunction = function (ns, host) {
+      let v = [host];
+      options.debug && options.verbose && ns.tprint("host:" + host);
+
+      const hasRootAccess = ns.hasRootAccess(host)
+      options.debug && options.verbose && ns.tprint("hasRootAccess:" + hasRootAccess);
+      v.push(hasRootAccess);
+
+      const getGrowTime = ns.getGrowTime(host)
+      options.debug && options.verbose && ns.tprint("getGrowTime:" + getGrowTime);
+      v.push(getGrowTime / 1000);
+
+      const getServerGrowth = ns.getServerGrowth(host)
+      options.debug && options.verbose && ns.tprint("getServerGrowth:" + getServerGrowth);
+      v.push(getServerGrowth);
+
+      const getServerMoneyAvailable = ns.getServerMoneyAvailable(host)
+      options.debug && options.verbose && ns.tprint("getServerMoneyAvailable:" + getServerMoneyAvailable);
+      v.push(getServerMoneyAvailable / 1000);
+
+      const getServerMaxMoney = ns.getServerMaxMoney(host)
+      options.debug && options.verbose && ns.tprint("getServerMaxMoney:" + getServerMaxMoney);
+      v.push(getServerMaxMoney / 1000);
+      
+      if (options.rootAcces == hasRootAccess) {
+        ns.tprintf("%s \t [%s] \t --> \t growTime:%.2f \t growth:%d%% \t currentMoney:%.2f k \t maxMoney:%d k", ...v);
+      }
+    }
+    myFunctionLoaded = true;
   }
 
-  // get argument flags
-  options = argParser(ns, options);
+  if (myFunctionLoaded && options.traverse) {
+    options.debug && ns.tprint("< call traverseNetwork >");
+    // runs the function that is set in the options
+    await traverseNetwork(ns, options);
+    ns.exit();
+  }
 
+  if (myFunctionLoaded && options.host.length == 1) {
+    options.debug && ns.tprint("< run loaded function with given host >");
+    // runs the function that is set in the options
+    options.myFunction(ns, options.host);
+    ns.exit();
+  }
 
+  if (myFunctionLoaded) {
+    options.debug && ns.tprint("< run loaded function host of where code runs>");
+    // runs the function that is set in the options with hostname of where the code runs
+    options.myFunction(ns, ns.getHostname());
+    ns.exit();
+  }
 
-  ns.tprint("");
-  ns.tprint("");
-  ns.tprint("");
-  ns.tprint("init program");
-  await ns.sleep(options.sleep);
-  ns.tprint("");
-  ns.tprint("-> validate input <-");
-
-  const host = ns.getHostname();
-  const growTime = ns.getGrowTime(host);
-  const weakenTime = ns.getWeakenTime(host);
-  const hackTime = ns.getHackTime(host);
-  const hackAnalyze = ns.hackAnalyze(host);
-  const hackAnalyzeChance = ns.hackAnalyzeChance(host);
-  const hackAnalyzeSecurity = ns.hackAnalyzeSecurity(threads);
-  const hackAnalyzeThreads = ns.hackAnalyzeThreads(host, hackAmount);
-  const maxMoney = ns.getServerMaxMoney(host);
-  const currentMoney = ns.getServerMoneyAvailable(host);
-  const minSecurity = ns.getServerMinSecurityLevel(host);
-  const security = ns.getServerSecurityLevel(host);
-
+  ns.tprint("pick a function, or check help");
 }
 
 /** @param {NS} ns **/
-function argParser(ns, options) {
+async function myArgParser(ns, options) {
+  options.debug && ns.tprint("< argParser running >");
+  await ns.sleep(options.sleep);
 
   let nextArg = false;
 
@@ -51,14 +99,14 @@ function argParser(ns, options) {
       const option = typeof el == "string" ? el.slice(2) : false;
 
       if (elPrefix == "--") {
-        ns.tprint(el + " is a flag");
+        options.debug && options.verbose && ns.tprint(el + " is a flag");
         // check if in defined options
-        ns.tprint(option + ":possible option");
+        options.debug && options.verbose && ns.tprint(option + ":possible option");
         if (option in options) {
-          ns.tprint(option + ":option identified");
+          options.debug && options.verbose && ns.tprint(option + ":option identified");
           if (typeof options[option] == 'boolean') {
             options[option] = !options[option];
-            ns.tprint(option + ":" + options[option] + " -> option switched");
+            options.debug && options.verbose && ns.tprint(option + ":" + options[option] + " -> option switched");
           } else {
             nextArg = option;
           }
@@ -71,7 +119,7 @@ function argParser(ns, options) {
     } else {
       // check if next arg is input of previous
       if (nextArg) {
-        ns.tprint(nextArg + " values -> " + el);
+        options.debug && options.verbose && ns.tprint(nextArg + " values -> " + el);
         options[nextArg] = el;
         nextArg = false;
       }
@@ -82,24 +130,35 @@ function argParser(ns, options) {
 
 /** @param {NS} ns **/
 async function traverseNetwork(ns, options) {
+  options.debug && ns.tprint("< traverseNetwork running >");
+  await ns.sleep(options.sleep);
 
   // get server host of options; defaults to current host
-  const host = options.host.length > 0 ? options.host : ns.getHostname();
+  const host = options.host.length == 1 ? options.host : ns.getHostname();
 
+  /** @param {NS} ns **/
   async function traverse(ns, options, host, previous = []) {
+    options.debug && ns.tprint("< traverse running >");
     await ns.sleep(options.sleep);
+    
     let a = ns.scan(host);
-    let b = a.filter(value => value != previous.includes(value));
+    options.debug && options.verbose && ns.tprint("a: " + a);
+    let b = a.filter(value => !previous.includes(value));
+    options.debug && options.verbose && ns.tprint("b: " + b);
 
-    while(b.length) {
+    while (b.length) {
       let host = b.shift();
+      options.debug && options.verbose && ns.tprint("host: " + host);
+
       previous.push(host);
+      options.debug && options.verbose && ns.tprint("previous: " + previous);
 
       // runs the function that is set in the options
-      options.function(host);
+      options.myFunction(ns, host);
 
-      traverse(ns, options, host, previous);
+      await traverse(ns, options, host, previous);
     }
-    return;
   }
+
+  await traverse(ns, options, host);
 }

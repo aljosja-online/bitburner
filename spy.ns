@@ -1,0 +1,105 @@
+/** @param {NS} ns **/
+export async function main(ns) {
+
+  let options = {
+    "host": [],
+    "hostlist": "",
+    "overwrite": false,
+    "scan": false,
+    "sleep": 220
+  }
+
+  // get argument flags
+  options = argParser(ns, options);
+
+
+
+  ns.tprint("");
+  ns.tprint("");
+  ns.tprint("");
+  ns.tprint("init program");
+  await ns.sleep(options.sleep);
+  ns.tprint("");
+  ns.tprint("-> validate input <-");
+
+  const host = ns.getHostname();
+  const growTime = ns.getGrowTime(host);
+  const weakenTime = ns.getWeakenTime(host);
+  const hackTime = ns.getHackTime(host);
+  const hackAnalyze = ns.hackAnalyze(host);
+  const hackAnalyzeChance = ns.hackAnalyzeChance(host);
+  const hackAnalyzeSecurity = ns.hackAnalyzeSecurity(threads);
+  const hackAnalyzeThreads = ns.hackAnalyzeThreads(host, hackAmount);
+  const maxMoney = ns.getServerMaxMoney(host);
+  const currentMoney = ns.getServerMoneyAvailable(host);
+  const minSecurity = ns.getServerMinSecurityLevel(host);
+  const security = ns.getServerSecurityLevel(host);
+
+}
+
+/** @param {NS} ns **/
+function argParser(ns, options) {
+
+  let nextArg = false;
+
+  for (let i = 0; i < ns.args.length; i++) {
+    const el = ns.args[i];
+
+    if (!nextArg) {
+      // check if flags
+      const elPrefix = typeof el == "string" ? el.slice(0, 2) : false;
+      const option = typeof el == "string" ? el.slice(2) : false;
+
+      if (elPrefix == "--") {
+        ns.tprint(el + " is a flag");
+        // check if in defined options
+        ns.tprint(option + ":possible option");
+        if (option in options) {
+          ns.tprint(option + ":option identified");
+          if (typeof options[option] == 'boolean') {
+            options[option] = !options[option];
+            ns.tprint(option + ":" + options[option] + " -> option switched");
+          } else {
+            nextArg = option;
+          }
+        } else {
+          ns.tprint(option + " is an unknown flag");
+        }
+      } else {
+        ns.tprint(el + " is unrecognized input");
+      }
+    } else {
+      // check if next arg is input of previous
+      if (nextArg) {
+        ns.tprint(nextArg + " values -> " + el);
+        options[nextArg] = el;
+        nextArg = false;
+      }
+    }
+  }
+  return options;
+}
+
+/** @param {NS} ns **/
+async function traverseNetwork(ns, options) {
+
+  // get server host of options; defaults to current host
+  const host = options.host.length > 0 ? options.host : ns.getHostname();
+
+  async function traverse(ns, options, host, previous = []) {
+    await ns.sleep(options.sleep);
+    let a = ns.scan(host);
+    let b = a.filter(value => value != previous.includes(value));
+
+    while(b.length) {
+      let host = b.shift();
+      previous.push(host);
+
+      // runs the function that is set in the options
+      options.function(host);
+
+      traverse(ns, options, host, previous);
+    }
+    return;
+  }
+}
